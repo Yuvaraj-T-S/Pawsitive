@@ -14,6 +14,7 @@
   <div class="logo">Paws<span>itive</span></div>
   <nav id="nav">
     <button data-view="shop" class="on">Shop</button>
+    <button data-view="wishlist">Wishlist (<span id="wishlistCount">0</span>)</button>
     <button data-view="health">Vet care</button>
     <button data-view="account">My activity</button>
   </nav>
@@ -40,15 +41,22 @@
   <div class="grid" id="products"></div>
 </section>
 
+<!-- WISHLIST -->
+<section class="view" id="v-wishlist">
+  <h2>Your wishlist</h2>
+  <p class="empty">Save products here to find and order them again later.</p>
+  <div class="grid" id="wishlistProducts"></div>
+</section>
+
 <!-- HEALTH -->
 <section class="view" id="v-health">
   <h2>Pet healthcare</h2>
   <div class="services">
-    <div><b>General check-up</b><br>₹600</div>
-    <div><b>Vaccination</b><br>₹800</div>
-    <div><b>Dental cleaning</b><br>₹1,500</div>
-    <div><b>Grooming &amp; skin care</b><br>₹900</div>
-    <div><b>Emergency consult</b><br>₹1,200</div>
+    <details class="service-card"><summary><span><b>General check-up</b><small>Hover or tap for details</small></span><strong>₹600</strong></summary><div class="service-details"><p>A routine nose-to-tail exam, weight check, and time to discuss your pet’s health and care questions.</p></div></details>
+    <details class="service-card"><summary><span><b>Vaccination</b><small>Hover or tap for details</small></span><strong>₹800</strong></summary><div class="service-details"><p>A vet consultation to review vaccination history, check your pet, and recommend any due vaccines. Bring the vaccination record if available.</p></div></details>
+    <details class="service-card"><summary><span><b>Dental cleaning</b><small>Hover or tap for details</small></span><strong>₹1,500</strong></summary><div class="service-details"><p>Dental health assessment and cleaning plan with the vet. The vet will explain any further care needed after examining your pet.</p></div></details>
+    <details class="service-card"><summary><span><b>Grooming &amp; skin care</b><small>Hover or tap for details</small></span><strong>₹900</strong></summary><div class="service-details"><p>Gentle bath with pet-safe shampoo, coat brushing and detangling, nail trim, and external ear cleaning. Includes a basic skin and coat check; concerns such as persistent itching or irritation can be discussed with the vet.</p></div></details>
+    <details class="service-card"><summary><span><b>Emergency consult</b><small>Hover or tap for details</small></span><strong>₹1,200</strong></summary><div class="service-details"><p>An urgent veterinary assessment to understand the concern and discuss appropriate next steps. Availability is confirmed when you request an appointment.</p></div></details>
   </div>
   <form class="panel" id="apptForm">
     <h3>Book an appointment</h3>
@@ -68,9 +76,9 @@
     </select>
     <div class="two">
       <div><label for="apptDate">Date</label><input type="date" id="apptDate" required></div>
-      <div><label for="apptTime">Time</label>
-        <select id="apptTime"><option>10:00 AM</option><option>11:00 AM</option><option>12:00 PM</option><option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option><option>5:00 PM</option></select></div>
+      <div><label for="apptTime">Time</label><select id="apptTime" required><option value="">Choose a date first</option></select></div>
     </div>
+    <small class="slot-note">Each appointment is 30 minutes. Closed Sundays.</small>
     <label for="notes">Anything the vet should know? (optional)</label>
     <textarea id="notes" rows="3"></textarea>
     <p class="msg" id="apptMsg"></p>
@@ -136,6 +144,7 @@ const PRODUCTS = [
 const $ = id => document.getElementById(id);
 const rupee = n => '₹' + Number(n).toLocaleString('en-IN');
 let cart = [], filter = 'All';
+let favorites = JSON.parse(localStorage.getItem('pawsitiveFavorites') || '[]').map(Number);
 
 /* ---------- helpers ---------- */
 function toast(t){const el=$('toast');el.textContent=t;el.style.display='block';setTimeout(()=>el.style.display='none',2800)}
@@ -144,6 +153,7 @@ function show(v){
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
   if(v==='account') loadAccount();
+  if(v==='wishlist') renderWishlist();
   window.scrollTo({top:0});
 }
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
@@ -157,14 +167,21 @@ function renderFilters(){
 function renderProducts(){
   const query = $('search').value.trim().toLowerCase();
   const matches = PRODUCTS.filter(p=>(filter==='All'||p.cat===filter)&&(!query||p.name.toLowerCase().includes(query)||p.cat.toLowerCase().includes(query)));
-  $('products').innerHTML = matches.length ? matches.map(p=>`
-    <div class="prod"><div class="pic"><img src="https://images.unsplash.com/${p.image}?auto=format&fit=crop&w=600&q=78" alt="${p.name}" data-fallback="${p.icon}"></div>
-      <small>${p.cat}</small><b>${p.name}</b><div class="rating" aria-label="Rated ${p.rating} out of 5">★ ${p.rating} <span>(${p.reviews} reviews)</span></div>
-      <div class="row"><span class="price">${rupee(p.price)}</span>
-      <button class="btn" data-id="${p.id}">Add</button></div></div>`).join('')
+  $('products').innerHTML = matches.length ? matches.map(productCard).join('')
     : '<p class="empty">No products match that search. Try another name or category.</p>';
-  $('products').querySelectorAll('button').forEach(b=>b.onclick=()=>addToCart(+b.dataset.id));
-  $('products').querySelectorAll('.prod .pic img').forEach(img=>img.onerror=()=>{
+  attachProductActions($('products'));
+}
+function productCard(p){
+  const isFavorite=favorites.includes(p.id);
+  return `<div class="prod"><div class="pic"><img src="https://images.unsplash.com/${p.image}?auto=format&fit=crop&w=600&q=78" alt="${p.name}" data-fallback="${p.icon}">
+      <button class="favorite-btn ${isFavorite?'saved':''}" type="button" data-favorite-id="${p.id}" aria-label="${isFavorite?'Remove from':'Add to'} wishlist" aria-pressed="${isFavorite}">${isFavorite?'♥':'♡'}</button></div>
+      <small>${p.cat}</small><b>${p.name}</b><div class="rating" aria-label="Rated ${p.rating} out of 5">★ ${p.rating} <span>(${p.reviews} reviews)</span></div>
+      <div class="row"><span class="price">${rupee(p.price)}</span><button class="btn" data-id="${p.id}">Add</button></div></div>`;
+}
+function attachProductActions(container){
+  container.querySelectorAll('.prod .btn[data-id]').forEach(b=>b.onclick=()=>addToCart(+b.dataset.id));
+  container.querySelectorAll('.favorite-btn').forEach(b=>b.onclick=()=>toggleFavorite(+b.dataset.favoriteId));
+  container.querySelectorAll('.prod .pic img').forEach(img=>img.onerror=()=>{
     const fallback=document.createElement('div');
     fallback.className='fallback';
     fallback.setAttribute('aria-hidden','true');
@@ -172,6 +189,20 @@ function renderProducts(){
     img.replaceWith(fallback);
   });
 }
+function toggleFavorite(id){
+  favorites=favorites.includes(id)?favorites.filter(x=>x!==id):[...favorites,id];
+  localStorage.setItem('pawsitiveFavorites',JSON.stringify(favorites));
+  $('wishlistCount').textContent=favorites.length;
+  renderProducts();
+  if($('v-wishlist').classList.contains('on')) renderWishlist();
+  toast(favorites.includes(id)?'Added to wishlist':'Removed from wishlist');
+}
+function renderWishlist(){
+  const saved=PRODUCTS.filter(p=>favorites.includes(p.id));
+  $('wishlistProducts').innerHTML=saved.length?saved.map(productCard).join(''):'<p class="empty">Your wishlist is empty. Tap ♡ on a product to save it here.</p>';
+  attachProductActions($('wishlistProducts'));
+}
+function renderFavoriteCount(){$('wishlistCount').textContent=favorites.length;}
 $('search').addEventListener('input',renderProducts);
 
 /* ---------- cart ---------- */
@@ -217,15 +248,57 @@ $('checkoutForm').onsubmit = async e=>{
 };
 
 /* ---------- appointments ---------- */
-$('apptDate').min = new Date().toISOString().split('T')[0];
+const localNow=new Date();
+localNow.setMinutes(localNow.getMinutes()-localNow.getTimezoneOffset());
+$('apptDate').min=localNow.toISOString().slice(0,10);
+const appointmentSlots=[];
+for(let minute=10*60;minute<13*60;minute+=30) appointmentSlots.push(minute);
+for(let minute=14*60;minute<18*60;minute+=30) appointmentSlots.push(minute);
+function slotLabel(minute){
+  const hour=Math.floor(minute/60),minutes=String(minute%60).padStart(2,'0');
+  return `${hour%12||12}:${minutes} ${hour<12?'AM':'PM'}`;
+}
+function renderAppointmentSlots(booked=new Set()){
+  const isSunday=$('apptDate').value&&new Date($('apptDate').value+'T00:00:00').getDay()===0;
+  $('apptTime').innerHTML=isSunday?'<option value="">Closed on Sundays</option>':'<option value="">Choose a 30-minute slot</option>'+appointmentSlots.map(minute=>{
+    const label=slotLabel(minute),isBooked=booked.has(label);
+    return `<option value="${label}" ${isBooked?'disabled':''}>${label}${isBooked?' · Booked':''}</option>`;
+  }).join('');
+}
+async function refreshAppointmentSlots(){
+  const date=$('apptDate').value;
+  if(!date){renderAppointmentSlots();return;}
+  if(new Date(date+'T00:00:00').getDay()===0){
+    $('apptDate').setCustomValidity('Appointments are not available on Sundays. Please choose another date.');
+    $('apptDate').reportValidity();$('apptDate').value='';renderAppointmentSlots();return;
+  }
+  $('apptDate').setCustomValidity('');
+  $('apptMsg').textContent='Checking available times…';
+  renderAppointmentSlots();
+  const {data,error}=await db.from('appointments').select('appointment_time').eq('appointment_date',date);
+  if($('apptDate').value!==date)return;
+  if(error){$('apptMsg').textContent='Could not load available times. You can still try booking a slot.';return;}
+  $('apptMsg').textContent='';
+  renderAppointmentSlots(new Set(data.map(row=>row.appointment_time)));
+}
+$('apptDate').addEventListener('change',refreshAppointmentSlots);
+renderAppointmentSlots();
 $('apptForm').onsubmit = async e=>{
   e.preventDefault();
+  if(new Date($('apptDate').value+'T00:00:00').getDay()===0){$('apptMsg').textContent='Appointments are not available on Sundays. Please choose another date.';return;}
+  if(!$('apptTime').value){$('apptMsg').textContent='Please choose an available time slot.';return;}
   const row={customer_name:$('customerName').value.trim(),customer_email:$('customerEmail').value.trim(),pet_name:$('petName').value.trim(), pet_type:$('petType').value,
     service:$('service').value, appointment_date:$('apptDate').value,
     appointment_time:$('apptTime').value, notes:$('notes').value.trim()||null
   };
+  const submit=e.target.querySelector('button[type="submit"]');submit.disabled=true;
   const {error} = await db.from('appointments').insert(row);
-  if(error){ $('apptMsg').textContent = error.message; return; }
+  submit.disabled=false;
+  if(error){
+    if(error.code==='23505'){await refreshAppointmentSlots();$('apptMsg').textContent='That time was just booked. Please choose another available slot.';}
+    else $('apptMsg').textContent=error.message;
+    return;
+  }
   saveActivity({type:'Appointment',reference:row.service,contact:row.customer_name,email:row.customer_email,pet:row.pet_name,date:row.appointment_date,time:row.appointment_time,created_at:new Date().toISOString()});
   $('apptMsg').textContent=''; e.target.reset(); toast('Appointment booked'); show('account');
 };
@@ -237,7 +310,7 @@ function loadAccount(){
   $('purchasesBox').innerHTML=entries.length?`<div class="services">${entries.map(x=>`<div><b>${esc(x.type)} · ${esc(x.reference)}</b><br>${esc(x.contact)} · ${esc(x.email)}<br>${x.type==='Appointment'?`${esc(x.pet)} · ${esc(x.date)} at ${esc(x.time)}`:x.items.map(i=>`${esc(i.item_name)} × ${i.quantity}`).join('<br>')}<br><small>${new Date(x.created_at).toLocaleDateString('en-IN')}</small></div>`).join('')}</div>`:'<p class="empty">No activity yet. Your orders and bookings will appear here.</p>';
 }
 
-renderFilters(); renderProducts(); renderCart();
+renderFavoriteCount(); renderFilters(); renderProducts(); renderCart();
 </script>
 </body>
 </html>
