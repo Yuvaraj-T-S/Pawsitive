@@ -259,12 +259,16 @@ $('apptDate').min=localNow.toISOString().slice(0,10);
 const appointmentSlots=[];
 for(let minute=10*60;minute<13*60;minute+=30) appointmentSlots.push(minute);
 for(let minute=14*60;minute<18*60;minute+=30) appointmentSlots.push(minute);
+let availabilityCheckedFor='';
 function slotLabel(minute){
   const hour=Math.floor(minute/60),minutes=String(minute%60).padStart(2,'0');
   return `${hour%12||12}:${minutes} ${hour<12?'AM':'PM'}`;
 }
 function renderAppointmentSlots(booked=new Set()){
-  const isSunday=$('apptDate').value&&new Date($('apptDate').value+'T00:00:00').getDay()===0;
+  const date=$('apptDate').value;
+  const isSunday=date&&new Date(date+'T00:00:00').getDay()===0;
+  if(!date){$('apptTime').innerHTML='<option value="">Choose a date first</option>';$('apptTime').disabled=true;return;}
+  $('apptTime').disabled=false;
   $('apptTime').innerHTML=isSunday?'<option value="">Closed on Sundays</option>':'<option value="">Choose a 30-minute slot</option>'+appointmentSlots.map(minute=>{
     const label=slotLabel(minute),isBooked=booked.has(label);
     return `<option value="${label}" ${isBooked?'disabled':''}>${label}${isBooked?' · Booked':''}</option>`;
@@ -272,6 +276,7 @@ function renderAppointmentSlots(booked=new Set()){
 }
 async function refreshAppointmentSlots(){
   const date=$('apptDate').value;
+  availabilityCheckedFor='';
   if(!date){renderAppointmentSlots();return;}
   if(new Date(date+'T00:00:00').getDay()===0){
     $('apptDate').setCustomValidity('Appointments are not available on Sundays. Please choose another date.');
@@ -279,18 +284,22 @@ async function refreshAppointmentSlots(){
   }
   $('apptDate').setCustomValidity('');
   $('apptMsg').textContent='Checking available times…';
-  renderAppointmentSlots();
+  $('apptTime').disabled=true;
+  $('apptTime').innerHTML='<option value="">Checking availability…</option>';
   const {data,error}=await db.from('appointments').select('appointment_time').eq('appointment_date',date);
   if($('apptDate').value!==date)return;
-  if(error){$('apptMsg').textContent='Could not load available times. You can still try booking a slot.';return;}
+  if(error){$('apptMsg').textContent='Could not check availability. Please try selecting the date again.';$('apptTime').innerHTML='<option value="">Availability check failed</option>';return;}
   $('apptMsg').textContent='';
+  availabilityCheckedFor=date;
   renderAppointmentSlots(new Set(data.map(row=>row.appointment_time)));
 }
 $('apptDate').addEventListener('change',refreshAppointmentSlots);
 renderAppointmentSlots();
 $('apptForm').onsubmit = async e=>{
   e.preventDefault();
-  if(new Date($('apptDate').value+'T00:00:00').getDay()===0){$('apptMsg').textContent='Appointments are not available on Sundays. Please choose another date.';return;}
+  const selectedDate=$('apptDate').value;
+  if(!selectedDate||new Date(selectedDate+'T00:00:00').getDay()===0){$('apptMsg').textContent='Appointments are not available on Sundays. Please choose another date.';return;}
+  if(availabilityCheckedFor!==selectedDate){$('apptMsg').textContent='Please wait for available times to load, then choose a slot.';return;}
   if(!$('apptTime').value){$('apptMsg').textContent='Please choose an available time slot.';return;}
   const row={customer_name:$('customerName').value.trim(),customer_email:$('customerEmail').value.trim(),pet_name:$('petName').value.trim(), pet_type:$('petType').value,
     service:$('service').value, appointment_date:$('apptDate').value,
@@ -305,7 +314,7 @@ $('apptForm').onsubmit = async e=>{
     return;
   }
   saveActivity({type:'Appointment',reference:row.service,contact:row.customer_name,email:row.customer_email,pet:row.pet_name,date:row.appointment_date,time:row.appointment_time,created_at:new Date().toISOString()});
-  $('apptMsg').textContent=''; e.target.reset(); toast('Appointment booked'); show('account');
+  $('apptMsg').textContent=''; e.target.reset();availabilityCheckedFor='';renderAppointmentSlots();toast('Appointment booked');show('account');
 };
 
 /* ---------- local activity history ---------- */
