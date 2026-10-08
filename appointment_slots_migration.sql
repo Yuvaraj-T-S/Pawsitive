@@ -47,3 +47,4 @@ grant select (appointment_date, appointment_time)
   on table public.appointments to anon, authenticated;
 
 notify pgrst, 'reload schema';
+ 
