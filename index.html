@@ -27,8 +27,8 @@
     <p class="eyebrow">A little more joy, every day</p>
     <h1>Good food, good gear, good health for your pet.</h1>
     <p>Order food, treats and accessories, or book a vet visit. Check out with just your name and email—no account needed.</p>
-    <button class="btn" onclick="show('shop')">Shop now</button>
-    <button class="btn ghost" style="color:var(--ink);margin-left:8px" onclick="show('health')">Book a vet visit</button>
+    <button class="btn" id="shopCta" aria-pressed="true" onclick="show('shop')">Shop now</button>
+    <button class="btn ghost" id="vetCta" aria-pressed="false" style="color:var(--ink);margin-left:8px" onclick="show('health')">Book a vet visit</button>
   </div>
   <div class="big" role="img" aria-label="Happy dog enjoying time outdoors"></div>
 </div>
@@ -152,6 +152,11 @@ function esc(s){const d=document.createElement('div');d.textContent=s??'';return
 function show(v){
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  const vetActive=v==='health';
+  $('shopCta').classList.toggle('ghost',vetActive);
+  $('vetCta').classList.toggle('ghost',!vetActive);
+  $('shopCta').setAttribute('aria-pressed',String(!vetActive));
+  $('vetCta').setAttribute('aria-pressed',String(vetActive));
   if(v==='account') loadAccount();
   if(v==='wishlist') renderWishlist();
   window.scrollTo({top:0});
