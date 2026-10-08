@@ -122,11 +122,11 @@ const PRODUCTS = [
   {id:1,name:'Chicken & Rice Dog Food 3kg',cat:'Food',price:1299,icon:'🍗',rating:'4.8',reviews:126,image:'photo-1589924691995-400dc9ecc119'},
   {id:2,name:'Salmon Cat Food 1.5kg',cat:'Food',price:999,icon:'🐟',rating:'4.7',reviews:84,image:'photo-1601758228041-f3b2795255f1'},
   {id:3,name:'Puppy Starter Kibble 2kg',cat:'Food',price:849,icon:'🥣',rating:'4.9',reviews:63,image:'photo-1582798358481-d199fb7347bb'},
-  {id:4,name:'Grain-Free Adult Dog Food 5kg',cat:'Food',price:2199,icon:'🥩',rating:'4.8',reviews:92,image:'photo-1585870720724-773d6b2f2c47'},
+  {id:4,name:'Grain-Free Adult Dog Food 5kg',cat:'Food',price:2199,icon:'🥩',rating:'4.8',reviews:92,image:'photo-1764249453891-84799ed79e9e'},
   {id:5,name:'Peanut Butter Biscuits',cat:'Treats',price:249,icon:'🍪',rating:'4.9',reviews:51,image:'photo-1582798358481-d199fb7347bb'},
   {id:6,name:'Dental Chew Sticks (10)',cat:'Treats',price:349,icon:'🦴',rating:'4.6',reviews:39,image:'photo-1589924691995-400dc9ecc119'},
   {id:7,name:'Tuna Cat Treats',cat:'Treats',price:199,icon:'🍤',rating:'4.8',reviews:44,image:'photo-1573865526739-10659fec78a5'},
-  {id:8,name:'Adjustable Nylon Collar',cat:'Accessories',price:399,icon:'📿',rating:'4.7',reviews:28,image:'photo-1601758123927-1966a9d1a3dc'},
+  {id:8,name:'Adjustable Nylon Collar',cat:'Accessories',price:399,icon:'📿',rating:'4.7',reviews:28,image:'photo-1546687813-3fcc1c363a07'},
   {id:9,name:'Squeaky Rope Toy',cat:'Accessories',price:299,icon:'🧸',rating:'4.8',reviews:76,image:'photo-1535294435445-d7249524ef2e'},
   {id:10,name:'Cozy Pet Bed (M)',cat:'Accessories',price:1599,icon:'🛏️',rating:'4.9',reviews:34,image:'photo-1541599540903-216a46ca1dc0'},
   {id:11,name:'Retractable Leash 5m',cat:'Accessories',price:699,icon:'🦮',rating:'4.6',reviews:22,image:'photo-1551717743-49959800b1f6'},
@@ -158,12 +158,19 @@ function renderProducts(){
   const query = $('search').value.trim().toLowerCase();
   const matches = PRODUCTS.filter(p=>(filter==='All'||p.cat===filter)&&(!query||p.name.toLowerCase().includes(query)||p.cat.toLowerCase().includes(query)));
   $('products').innerHTML = matches.length ? matches.map(p=>`
-    <div class="prod"><div class="pic"><img src="https://images.unsplash.com/${p.image}?auto=format&fit=crop&w=600&q=78" alt="${p.name}" onerror="this.parentNode.innerHTML='<div class=\'fallback\' aria-hidden=\'true\'>${p.icon}</div>'"></div>
+    <div class="prod"><div class="pic"><img src="https://images.unsplash.com/${p.image}?auto=format&fit=crop&w=600&q=78" alt="${p.name}" data-fallback="${p.icon}"></div>
       <small>${p.cat}</small><b>${p.name}</b><div class="rating" aria-label="Rated ${p.rating} out of 5">★ ${p.rating} <span>(${p.reviews} reviews)</span></div>
       <div class="row"><span class="price">${rupee(p.price)}</span>
       <button class="btn" data-id="${p.id}">Add</button></div></div>`).join('')
     : '<p class="empty">No products match that search. Try another name or category.</p>';
   $('products').querySelectorAll('button').forEach(b=>b.onclick=()=>addToCart(+b.dataset.id));
+  $('products').querySelectorAll('.prod .pic img').forEach(img=>img.onerror=()=>{
+    const fallback=document.createElement('div');
+    fallback.className='fallback';
+    fallback.setAttribute('aria-hidden','true');
+    fallback.textContent=img.dataset.fallback||'🐾';
+    img.replaceWith(fallback);
+  });
 }
 $('search').addEventListener('input',renderProducts);
 
@@ -234,4 +241,3 @@ renderFilters(); renderProducts(); renderCart();
 </script>
 </body>
 </html>
-
